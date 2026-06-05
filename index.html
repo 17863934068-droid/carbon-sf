@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Carbon SF · 碳积分价值转化原型</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+
+  :root{
+    --bg:#0a0f0c;
+    --panel:#10171260;
+    --green:#19e57f;
+    --green-deep:#0fae5e;
+    --green-glow:rgba(25,229,127,.35);
+    --ink:#eafff2;
+    --muted:#7f9889;
+    --line:#1d2a22;
+    --card:#0e1611;
+    --gold:#e8c97a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Noto Sans SC',sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* no frame — full screen layout */
+  .device{width:100%;position:relative;}
+  .btn-vol-up,.btn-vol-dn,.btn-power{display:none;}
+  .screen-wrap{display:contents;}
+  .screen{
+    background:var(--bg);
+    min-height:100vh;
+    position:relative;
+    display:flex;flex-direction:column;
+  }
+  /* hide fake chrome elements */
+  .island,.statusbar,.caption{display:none;}
+  /* safe area for notch / Dynamic Island on real device */
+  .topbar{padding-top:env(safe-area-inset-top,16px);}
+
+  /* ===== top bar ===== */
+  .topbar{
+    padding:calc(env(safe-area-inset-top,16px) + 10px) 22px 14px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  /* wordmark only, no colored box */
+  .brand-wordmark{
+    font-family:'Sora';font-weight:800;font-size:18px;letter-spacing:-.3px;
+    background:linear-gradient(135deg,var(--green),#a8f5cc);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .brand-sub{color:var(--muted);font-size:11px;margin-top:1px;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .notif-dot{
+    width:32px;height:32px;border-radius:50%;
+    background:#13201840;border:1px solid var(--line);
+    display:grid;place-items:center;font-size:15px;cursor:pointer;
+  }
+
+  /* ===== scroll body ===== */
+  .body{flex:1;overflow-y:auto;padding:4px 18px calc(96px + env(safe-area-inset-bottom,0px));scrollbar-width:none;}
+  .body::-webkit-scrollbar{display:none;}
+
+  /* ===== credit hero ===== */
+  .hero{
+    margin-top:8px;
+    background:
+      radial-gradient(120% 100% at 100% 0%, rgba(25,229,127,.18), transparent 60%),
+      linear-gradient(160deg,#0f1a14,#0b120e);
+    border:1px solid var(--line);
+    border-radius:24px;padding:22px 20px 20px;position:relative;overflow:hidden;
+  }
+  .hero::after{
+    content:"";position:absolute;right:-30px;top:-30px;width:140px;height:140px;
+    background:radial-gradient(circle,var(--green-glow),transparent 70%);filter:blur(8px);
+  }
+  /* Label — smallest, all-caps hint */
+  .hero .label{color:var(--muted);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;}
+  /* Points — hero number, dominant */
+  .hero .points{
+    font-family:'Sora';font-weight:800;font-size:52px;line-height:1;margin-top:4px;
+    color:var(--green);text-shadow:0 0 30px var(--green-glow);
+    display:flex;align-items:baseline;gap:8px;
+  }
+  /* Unit label — secondary to the number */
+  .hero .points small{font-size:15px;color:var(--ink);font-weight:500;opacity:.7;}
+  .hero .sub{margin-top:14px;display:flex;gap:18px;}
+  /* Stat label — caption level */
+  .hero .stat{font-size:10px;color:var(--muted);font-weight:400;}
+  /* Stat value — mid-level emphasis */
+  .hero .stat b{display:block;font-family:'Sora';font-size:18px;color:var(--ink);font-weight:700;margin-bottom:2px;}
+
+  .tier{margin-top:16px;}
+  .tier .row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px;}
+  .bar{height:7px;border-radius:6px;background:#15211a;overflow:hidden;}
+  .bar i{display:block;height:100%;width:0;border-radius:6px;
+    background:linear-gradient(90deg,var(--green-deep),var(--green));transition:width 1s cubic-bezier(.2,.8,.2,1);}
+
+  /* ===== section heading ===== */
+  .h{margin:28px 4px 10px;display:flex;align-items:center;justify-content:space-between;}
+  /* Section label — largest text in the group, bold anchor */
+  .h h3{font-family:'Sora';font-size:17px;font-weight:800;letter-spacing:-.1px;color:var(--ink);}
+  .h span{font-size:11px;color:var(--green);font-weight:500;}
+
+  /* ===== action cards (earn) ===== */
+  .actions{display:flex;flex-direction:column;gap:10px;}
+  .act{
+    display:flex;align-items:center;gap:14px;
+    background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:14px 16px;cursor:pointer;transition:.25s;position:relative;overflow:hidden;
+  }
+  .act:active{transform:scale(.985);}
+  .act.done{opacity:.55;border-color:#16241c;}
+  .act .ic{
+    width:44px;height:44px;border-radius:12px;flex:none;display:grid;place-items:center;
+    background:#13201840;border:1px solid var(--line);font-size:21px;
+  }
+  .act .meta{flex:1;}
+  /* Card title — mid level, clearly readable */
+  .act .meta b{font-size:14px;font-weight:700;display:block;color:var(--ink);letter-spacing:-.1px;}
+  /* Description — clearly smaller and muted */
+  .act .meta p{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;font-weight:400;}
+  .act .gain{font-family:'Sora';font-weight:800;color:var(--green);font-size:15px;flex:none;}
+  .act.done .gain{color:var(--muted);}
+  .act .gain.tap::after{content:"领取";display:block;font-size:9px;color:var(--muted);font-weight:400;text-align:right;margin-top:2px;}
+
+  .ripple{position:absolute;border-radius:50%;background:var(--green-glow);transform:scale(0);animation:rip .6s ease-out;pointer-events:none;}
+  @keyframes rip{to{transform:scale(4);opacity:0;}}
+
+  /* ===== redeem grid ===== */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .rd{
+    background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:16px;cursor:pointer;transition:.25s;position:relative;overflow:hidden;
+  }
+  .rd:active{transform:scale(.97);}
+  .rd .emoji{font-size:28px;}
+  /* Redeem card title — prominent */
+  .rd b{display:block;font-size:13px;font-weight:700;margin-top:10px;color:var(--ink);letter-spacing:-.1px;}
+  /* Redeem card description — clearly secondary */
+  .rd p{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5;font-weight:400;}
+  .rd .cost{
+    margin-top:12px;display:inline-flex;align-items:center;gap:5px;
+    font-family:'Sora';font-weight:800;font-size:12px;color:var(--green);
+    background:#13201833;border:1px solid var(--line);padding:5px 10px;border-radius:20px;
+  }
+  .rd.locked{opacity:.45;}
+  .rd.locked .cost{color:var(--muted);}
+
+  /* impact viz */
+  .impact{
+    margin-top:6px;background:linear-gradient(160deg,#0f1a14,#0b120e);
+    border:1px solid var(--line);border-radius:20px;padding:18px;
+  }
+  .impact .forest{display:flex;align-items:flex-end;gap:5px;height:70px;margin:14px 0 6px;}
+  .impact .tree{
+    flex:1;background:linear-gradient(180deg,var(--green),var(--green-deep));
+    border-radius:5px 5px 2px 2px;opacity:.85;transition:height .8s cubic-bezier(.2,.8,.2,1);
+  }
+  .impact .cap{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;}
+
+  /* ===== profile page ===== */
+  .profile-avatar{
+    display:flex;flex-direction:column;align-items:center;padding:16px 0 24px;
+  }
+  .avatar-ring{
+    width:80px;height:80px;border-radius:50%;
+    background:linear-gradient(135deg,var(--green),var(--green-deep));
+    padding:2px;margin-bottom:12px;
+  }
+  .avatar-inner{
+    width:100%;height:100%;border-radius:50%;
+    background:#122018;
+    display:grid;place-items:center;font-size:36px;
+  }
+  .profile-name{font-family:'Sora';font-weight:700;font-size:18px;}
+  .profile-level{
+    margin-top:6px;
+    display:inline-flex;align-items:center;gap:6px;
+    background:linear-gradient(135deg,rgba(25,229,127,.15),rgba(15,174,94,.08));
+    border:1px solid rgba(25,229,127,.25);
+    padding:4px 12px;border-radius:20px;
+    font-size:12px;color:var(--green);font-weight:600;
+  }
+  .profile-stats{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+    background:var(--line);border-radius:18px;overflow:hidden;margin-bottom:18px;
+  }
+  .pstat{
+    background:var(--card);padding:16px 12px;text-align:center;
+  }
+  .pstat .val{font-family:'Sora';font-size:20px;font-weight:800;color:var(--green);}
+  .pstat .lbl{font-size:10px;color:var(--muted);margin-top:4px;}
+
+  .cert-card{
+    background:linear-gradient(135deg,#0f1f16,#091209);
+    border:1px solid rgba(25,229,127,.2);
+    border-radius:20px;padding:18px 20px;margin-bottom:16px;
+    position:relative;overflow:hidden;
+  }
+  .cert-card::before{
+    content:'';position:absolute;right:-20px;bottom:-20px;
+    width:100px;height:100px;
+    background:radial-gradient(circle,rgba(25,229,127,.12),transparent 70%);
+  }
+  .cert-card .cert-title{font-family:'Sora';font-size:13px;font-weight:700;color:var(--green);margin-bottom:4px;}
+  .cert-card .cert-sub{font-size:11px;color:var(--muted);line-height:1.5;}
+  .cert-card .cert-badge{
+    margin-top:12px;display:inline-flex;align-items:center;gap:6px;
+    background:rgba(25,229,127,.1);border:1px solid rgba(25,229,127,.2);
+    padding:5px 12px;border-radius:20px;font-size:11px;color:var(--green);font-weight:600;
+  }
+
+  .menu-list{display:flex;flex-direction:column;gap:2px;}
+  .menu-item{
+    display:flex;align-items:center;gap:14px;
+    background:var(--card);border-radius:14px;padding:14px 16px;cursor:pointer;
+    transition:.2s;
+  }
+  .menu-item:active{transform:scale(.99);}
+  .menu-icon{width:36px;height:36px;border-radius:10px;background:#13201840;border:1px solid var(--line);display:grid;place-items:center;font-size:17px;flex:none;}
+  .menu-label{flex:1;font-size:14px;font-weight:500;}
+  .menu-arrow{color:var(--muted);font-size:16px;}
+
+  /* ===== tab bar ===== */
+  .tabs{
+    position:fixed;bottom:0;left:0;right:0;
+    height:calc(64px + env(safe-area-inset-bottom,0px));
+    background:rgba(8,13,10,.95);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border-top:1px solid var(--line);
+    display:flex;align-items:flex-start;justify-content:space-around;
+    padding-top:10px;padding-bottom:env(safe-area-inset-bottom,0px);z-index:40;
+  }
+  .tab{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    font-size:10px;color:var(--muted);cursor:pointer;transition:.2s;flex:1;padding-bottom:4px;
+  }
+  .tab .ti{display:block;width:24px;height:24px;}
+  .tab .ti svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+  .tab.on{color:var(--green);}
+
+  /* ===== toast ===== */
+  .toast{
+    position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);
+    background:linear-gradient(135deg,var(--green),var(--green-deep));color:#04130b;
+    font-weight:700;font-size:13px;padding:11px 20px;border-radius:30px;white-space:nowrap;
+    opacity:0;pointer-events:none;transition:.4s cubic-bezier(.2,.8,.2,1);z-index:60;
+    box-shadow:0 12px 30px var(--green-glow);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .page{display:none;animation:fade .4s ease;}
+  .page.on{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+  .caption{
+    position:absolute;left:50%;bottom:-52px;transform:translateX(-50%);
+    width:340px;text-align:center;color:#6f8478;font-size:11px;line-height:1.6;font-family:'Sora';
+  }
+
+  /* ===== sub pages ===== */
+  .sub-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 4px 18px;
+  }
+  .sub-header h3{font-family:'Sora';font-size:15px;font-weight:700;}
+  .back-btn{
+    font-size:15px;color:var(--green);cursor:pointer;padding:4px 0;
+    font-weight:600;min-width:48px;
+  }
+  .sub-header span{min-width:48px;}
+
+  /* history */
+  .history-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+  .hist-item{
+    display:flex;align-items:center;gap:12px;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;
+  }
+  .hist-icon{font-size:20px;width:36px;text-align:center;flex:none;}
+  .hist-meta{flex:1;}
+  .hist-meta b{font-size:13px;font-weight:600;display:block;}
+  .hist-meta p{font-size:10px;color:var(--muted);margin-top:2px;}
+  .hist-gain{font-family:'Sora';font-weight:700;font-size:13px;color:var(--green);flex:none;}
+  .hist-gain:not(:has(+)){color:#e57f7f;}
+  .hist-summary{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:14px 16px;font-size:12px;color:var(--muted);text-align:center;line-height:1.7;
+  }
+  .hist-summary b{color:var(--ink);}
+
+  /* notifications */
+  .notif-list{display:flex;flex-direction:column;gap:2px;}
+  .notif-row{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--card);border-radius:14px;padding:14px 16px;gap:12px;
+  }
+  .notif-left{display:flex;align-items:center;gap:12px;}
+  .notif-left b{font-size:13px;font-weight:600;display:block;}
+  .notif-left p{font-size:10px;color:var(--muted);margin-top:2px;}
+  .toggle{
+    width:44px;height:26px;border-radius:13px;background:#1d2a22;flex:none;
+    position:relative;cursor:pointer;transition:.3s;border:1px solid var(--line);
+  }
+  .toggle::after{
+    content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;
+    border-radius:50%;background:#4a6050;transition:.3s;
+  }
+  .toggle.on{background:var(--green-deep);border-color:var(--green);}
+  .toggle.on::after{left:21px;background:#fff;}
+
+  /* account */
+  .account-card{
+    background:linear-gradient(160deg,#0f1a14,#0b120e);
+    border:1px solid rgba(25,229,127,.2);border-radius:20px;
+    padding:24px;text-align:center;
+  }
+  .acc-title{font-family:'Sora';font-size:16px;font-weight:700;margin-bottom:6px;}
+  .acc-sub{font-size:12px;color:var(--muted);margin-bottom:12px;}
+  .acc-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    background:rgba(25,229,127,.1);border:1px solid rgba(25,229,127,.2);
+    padding:5px 14px;border-radius:20px;font-size:11px;color:var(--green);font-weight:600;
+  }
+
+  /* faq */
+  .faq-list{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .faq-item{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    overflow:hidden;cursor:pointer;
+  }
+  .faq-q{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;font-size:13px;font-weight:600;
+  }
+  .faq-arrow{color:var(--muted);transition:.3s;display:inline-block;}
+  .faq-item.open .faq-arrow{transform:rotate(90deg);color:var(--green);}
+  .faq-a{
+    font-size:11px;color:var(--muted);line-height:1.7;
+    max-height:0;overflow:hidden;transition:.35s ease;padding:0 16px;
+  }
+  .faq-item.open .faq-a{max-height:100px;padding:0 16px 14px;}
+  .feedback-btn{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:16px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;
+    color:var(--green);transition:.2s;
+  }
+  .feedback-btn:active{transform:scale(.98);}
+</style>
+</head>
+<body>
+<div class="device">
+  <div class="screen-wrap">
+  <div class="screen">
+
+    <div class="topbar">
+      <div class="brand">
+        <div>
+          <div class="brand-wordmark">Carbon SF</div>
+          <div class="brand-sub">低碳积分钱包</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="notif-dot">🔔</div>
+      </div>
+    </div>
+
+    <div class="body">
+      <!-- PAGE: EARN -->
+      <div class="page on" id="p-home">
+        <div class="hero">
+          <div class="label">我的碳积分</div>
+          <div class="points"><span id="pts">0</span><small>CC</small></div>
+          <div class="sub">
+            <div class="stat"><b id="kg">0</b>kg CO₂ 已减少</div>
+            <div class="stat"><b id="orders">0</b>次低碳配送</div>
+            <div class="stat"><b>Lv.2</b>低碳行动者</div>
+          </div>
+          <div class="tier">
+            <div class="row"><span>距离 Lv.3「碳达人」</span><span id="tierTxt">0 / 500</span></div>
+            <div class="bar"><i id="tierBar"></i></div>
+          </div>
+        </div>
+
+        <div class="h"><h3>赚取积分</h3><span>低碳行为 → 价值</span></div>
+        <div class="actions" id="earnList">
+          <div class="act" data-pts="80" data-kg="1.2" data-once="1">
+            <div class="ic">🚁</div>
+            <div class="meta"><b>选择无人机/新能源配送</b><p>本单包裹改用低碳运力派送</p></div>
+            <div class="gain tap">+80</div>
+          </div>
+          <div class="act" data-pts="40" data-kg="0.6" data-once="1">
+            <div class="ic">📦</div>
+            <div class="meta"><b>使用可回收环保包装</b><p>退回包装至 SF 智能回收点</p></div>
+            <div class="gain tap">+40</div>
+          </div>
+          <div class="act" data-pts="120" data-kg="2.4" data-once="1">
+            <div class="ic">🎮</div>
+            <div class="meta"><b>完成展览低碳互动游戏</b><p>M+「空中路径」碳足迹挑战</p></div>
+            <div class="gain tap">+120</div>
+          </div>
+          <div class="act" data-pts="30" data-kg="0.4" data-once="1">
+            <div class="ic">📍</div>
+            <div class="meta"><b>合并配送时段</b><p>集中收件，减少派送趟次</p></div>
+            <div class="gain tap">+30</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: REDEEM -->
+      <div class="page" id="p-shop">
+        <div class="h" style="margin-top:8px"><h3>兑换价值</h3><span id="balTxt">余额 0 CC</span></div>
+        <div class="grid" id="shopGrid">
+          <div class="rd" data-cost="100" data-tree="1">
+            <div class="emoji">🌳</div>
+            <b>种下一棵真树</b>
+            <p>联合环保组织在港郊野种植，可查证书</p>
+            <span class="cost">100 CC</span>
+          </div>
+          <div class="rd" data-cost="150">
+            <div class="emoji">🎟️</div>
+            <b>M+ 展览门票折扣</b>
+            <p>「空中路径」特展 8 折券</p>
+            <span class="cost">150 CC</span>
+          </div>
+          <div class="rd" data-cost="80">
+            <div class="emoji">☕</div>
+            <b>低碳商户优惠</b>
+            <p>合作环保咖啡品牌满减</p>
+            <span class="cost">80 CC</span>
+          </div>
+          <div class="rd" data-cost="300">
+            <div class="emoji">🏅</div>
+            <b>碳中和数字徽章</b>
+            <p>个人年度减碳认证 NFT</p>
+            <span class="cost">300 CC</span>
+          </div>
+        </div>
+
+        <div class="impact">
+          <div class="h" style="margin:0 0 4px"><h3>我的减碳影响</h3><span id="treeCount">🌳 ×0</span></div>
+          <div class="forest" id="forest"></div>
+          <div class="cap"><span>你已贡献的小森林</span><span id="impactKg">≈ 0 kg CO₂</span></div>
+        </div>
+      </div>
+
+      <!-- PAGE: PROFILE -->
+      <div class="page" id="p-profile">
+        <div class="profile-avatar">
+          <div class="avatar-ring">
+            <div class="avatar-inner">🌿</div>
+          </div>
+          <div class="profile-name">Green Explorer</div>
+          <div class="profile-level">🌱 Lv.2 · 低碳行动者</div>
+        </div>
+
+        <div class="profile-stats">
+          <div class="pstat">
+            <div class="val" id="p-pts">0</div>
+            <div class="lbl">碳积分</div>
+          </div>
+          <div class="pstat">
+            <div class="val" id="p-kg">0</div>
+            <div class="lbl">kg CO₂ 减少</div>
+          </div>
+          <div class="pstat">
+            <div class="val" id="p-orders">0</div>
+            <div class="lbl">低碳行动</div>
+          </div>
+        </div>
+
+        <div class="cert-card">
+          <div class="cert-title">2025 低碳行动证书</div>
+          <div class="cert-sub">你的行动已贡献真实减碳量，<br>可生成个人年度碳足迹报告</div>
+          <div class="cert-badge">🏅 查看我的证书</div>
+        </div>
+
+        <div class="h"><h3>我的设置</h3></div>
+        <div class="menu-list">
+          <div class="menu-item" data-sub="sub-history">
+            <div class="menu-icon">📊</div>
+            <span class="menu-label">减碳历史记录</span>
+            <span class="menu-arrow">›</span>
+          </div>
+          <div class="menu-item" data-sub="sub-notif">
+            <div class="menu-icon">🔔</div>
+            <span class="menu-label">通知偏好</span>
+            <span class="menu-arrow">›</span>
+          </div>
+          <div class="menu-item" data-sub="sub-account">
+            <div class="menu-icon">🔗</div>
+            <span class="menu-label">关联顺丰账号</span>
+            <span class="menu-arrow">›</span>
+          </div>
+          <div class="menu-item" data-sub="sub-help">
+            <div class="menu-icon">❓</div>
+            <span class="menu-label">帮助与反馈</span>
+            <span class="menu-arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB: 减碳历史记录 -->
+      <div class="page" id="sub-history">
+        <div class="sub-header">
+          <div class="back-btn" onclick="goBack()">‹ 返回</div>
+          <h3>减碳历史记录</h3>
+          <span></span>
+        </div>
+        <div class="history-list">
+          <div class="hist-item"><div class="hist-icon">🚁</div><div class="hist-meta"><b>无人机配送</b><p>2025-06-03 · 顺丰香港九龙城</p></div><div class="hist-gain">+80 CC</div></div>
+          <div class="hist-item"><div class="hist-icon">📦</div><div class="hist-meta"><b>环保包装回收</b><p>2025-06-02 · SF 智能回收点</p></div><div class="hist-gain">+40 CC</div></div>
+          <div class="hist-item"><div class="hist-icon">🎮</div><div class="hist-meta"><b>展览低碳游戏</b><p>2025-06-01 · M+ 博物馆</p></div><div class="hist-gain">+120 CC</div></div>
+          <div class="hist-item"><div class="hist-icon">📍</div><div class="hist-meta"><b>合并配送时段</b><p>2025-05-30 · 集中收件</p></div><div class="hist-gain">+30 CC</div></div>
+          <div class="hist-item"><div class="hist-icon">🌳</div><div class="hist-meta"><b>兑换种树</b><p>2025-05-28 · 郊野种植认证</p></div><div class="hist-gain">−100 CC</div></div>
+        </div>
+        <div class="hist-summary">共减少 <b>4.6 kg CO₂</b>，相当于种了 <b>1 棵树</b> 🌳</div>
+      </div>
+
+      <!-- SUB: 通知偏好 -->
+      <div class="page" id="sub-notif">
+        <div class="sub-header">
+          <div class="back-btn" onclick="goBack()">‹ 返回</div>
+          <h3>通知偏好</h3>
+          <span></span>
+        </div>
+        <div class="notif-list">
+          <div class="notif-row"><div class="notif-left"><div class="menu-icon">⚡</div><div><b>积分到账提醒</b><p>每次低碳行为完成后通知</p></div></div><div class="toggle on" data-tog></div></div>
+          <div class="notif-row"><div class="notif-left"><div class="menu-icon">🎁</div><div><b>兑换成功通知</b><p>积分兑换完成时提醒</p></div></div><div class="toggle on" data-tog></div></div>
+          <div class="notif-row"><div class="notif-left"><div class="menu-icon">🌱</div><div><b>等级升级提醒</b><p>达到新等级时通知</p></div></div><div class="toggle" data-tog></div></div>
+          <div class="notif-row"><div class="notif-left"><div class="menu-icon">📣</div><div><b>活动与优惠推送</b><p>低碳活动及合作商户信息</p></div></div><div class="toggle" data-tog></div></div>
+        </div>
+      </div>
+
+      <!-- SUB: 关联顺丰账号 -->
+      <div class="page" id="sub-account">
+        <div class="sub-header">
+          <div class="back-btn" onclick="goBack()">‹ 返回</div>
+          <h3>关联顺丰账号</h3>
+          <span></span>
+        </div>
+        <div class="account-card linked">
+          <div style="font-size:32px;margin-bottom:12px">✅</div>
+          <div class="acc-title">账号已关联</div>
+          <div class="acc-sub">顺丰速运 · 账户 186****8899</div>
+          <div class="acc-badge">同步 · 上次更新 5分钟前</div>
+        </div>
+        <div class="menu-list" style="margin-top:16px">
+          <div class="menu-item"><div class="menu-icon">🔄</div><span class="menu-label">重新同步数据</span><span class="menu-arrow">›</span></div>
+          <div class="menu-item" style="color:#e57f7f"><div class="menu-icon">🔓</div><span class="menu-label" style="color:#e57f7f">解除关联</span><span class="menu-arrow" style="color:#e57f7f">›</span></div>
+        </div>
+      </div>
+
+      <!-- SUB: 帮助与反馈 -->
+      <div class="page" id="sub-help">
+        <div class="sub-header">
+          <div class="back-btn" onclick="goBack()">‹ 返回</div>
+          <h3>帮助与反馈</h3>
+          <span></span>
+        </div>
+        <div class="faq-list">
+          <div class="faq-item" onclick="this.classList.toggle('open')">
+            <div class="faq-q"><span>碳积分怎么计算的？</span><span class="faq-arrow">›</span></div>
+            <div class="faq-a">碳积分根据每次低碳行为对应的 CO₂ 减少量换算，1 kg CO₂ ≈ 50–70 CC，具体以行为类型为准。</div>
+          </div>
+          <div class="faq-item" onclick="this.classList.toggle('open')">
+            <div class="faq-q"><span>积分有效期多久？</span><span class="faq-arrow">›</span></div>
+            <div class="faq-a">碳积分自获取之日起 24 个月内有效，到期前 30 天会收到提醒通知。</div>
+          </div>
+          <div class="faq-item" onclick="this.classList.toggle('open')">
+            <div class="faq-q"><span>种树证书在哪里查？</span><span class="faq-arrow">›</span></div>
+            <div class="faq-a">在「我的」→「2025 低碳行动证书」中可查看所有种树记录及第三方机构出具的电子证书。</div>
+          </div>
+          <div class="faq-item" onclick="this.classList.toggle('open')">
+            <div class="faq-q"><span>如何联系客服？</span><span class="faq-arrow">›</span></div>
+            <div class="faq-a">可通过顺丰 App 内客服入口联系，或发送邮件至 green@sf-express.com，工作日 9:00–18:00 响应。</div>
+          </div>
+        </div>
+        <div class="feedback-btn">💬 提交意见反馈</div>
+      </div>
+
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="tabs">
+      <!-- 赚积分: leaf/sprout icon -->
+      <div class="tab on" data-go="p-home">
+        <span class="ti">
+          <svg viewBox="0 0 24 24"><path d="M12 22V12M12 12C12 7 7 3 2 3c0 5 4 9 10 9zM12 12c0-5 5-9 10-9-1 5-5 9-10 9z"/></svg>
+        </span>
+        赚积分
+      </div>
+      <!-- 兑价值: gift/exchange icon -->
+      <div class="tab" data-go="p-shop">
+        <span class="ti">
+          <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8a1 1 0 001 1h12a1 1 0 001-1v-8"/><path d="M12 8V21M12 8c0-2 1.5-5 4-5s2 3 0 5H12zM12 8c0-2-1.5-5-4-5S6 6 8 8h4z"/></svg>
+        </span>
+        兑价值
+      </div>
+      <!-- 个人中心: person icon -->
+      <div class="tab" data-go="p-profile">
+        <span class="ti">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </span>
+        我的
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script>
+  let pts=0, kg=0, orders=0, trees=0;
+  const TIER_GOAL=500;
+  const $=id=>document.getElementById(id);
+
+  function animateNum(el,to,suffix=''){
+    if(!el)return;
+    const from=parseFloat(el.textContent)||0, dur=600, t0=performance.now();
+    function step(t){
+      const k=Math.min(1,(t-t0)/dur);
+      const v=from+(to-from)*(1-Math.pow(1-k,3));
+      el.textContent=(Number.isInteger(to)?Math.round(v):v.toFixed(1))+suffix;
+      if(k<1)requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function refresh(){
+    animateNum($('pts'),pts);
+    animateNum($('kg'),kg);
+    animateNum($('orders'),orders);
+    // profile page stats
+    animateNum($('p-pts'),pts);
+    animateNum($('p-kg'),kg);
+    animateNum($('p-orders'),orders);
+    const pct=Math.min(100,pts/TIER_GOAL*100);
+    $('tierBar').style.width=pct+'%';
+    $('tierTxt').textContent=Math.min(pts,TIER_GOAL)+' / '+TIER_GOAL;
+    $('balTxt').textContent='余额 '+pts+' CC';
+    document.querySelectorAll('.rd').forEach(rd=>{
+      rd.classList.toggle('locked', pts<+rd.dataset.cost);
+    });
+  }
+  function toast(msg){
+    const t=$('toast');t.textContent=msg;t.classList.add('show');
+    clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1600);
+  }
+  function ripple(e,el){
+    const r=document.createElement('span');r.className='ripple';
+    const d=Math.max(el.offsetWidth,el.offsetHeight);
+    r.style.width=r.style.height=d+'px';
+    const rect=el.getBoundingClientRect();
+    r.style.left=(e.clientX-rect.left-d/2)+'px';
+    r.style.top=(e.clientY-rect.top-d/2)+'px';
+    el.appendChild(r);setTimeout(()=>r.remove(),600);
+  }
+
+  // EARN
+  document.querySelectorAll('#earnList .act').forEach(act=>{
+    act.addEventListener('click',e=>{
+      if(act.classList.contains('done'))return;
+      ripple(e,act);
+      const p=+act.dataset.pts, k=+act.dataset.kg;
+      pts+=p; kg=+(kg+k).toFixed(1); orders++;
+      act.classList.add('done');
+      act.querySelector('.gain').classList.remove('tap');
+      act.querySelector('.gain').textContent='✓ 已领';
+      toast('+'+p+' CC 已入账 · 减碳 '+k+'kg');
+      refresh();
+    });
+  });
+
+  // REDEEM
+  document.querySelectorAll('#shopGrid .rd').forEach(rd=>{
+    rd.addEventListener('click',e=>{
+      const c=+rd.dataset.cost;
+      if(pts<c){toast('积分不足，去赚积分吧 →');return;}
+      ripple(e,rd);
+      pts-=c;
+      if(rd.dataset.tree){trees++;renderForest();$('treeCount').textContent='🌳 ×'+trees;}
+      toast('兑换成功 · 已扣 '+c+' CC 🎉');
+      refresh();
+    });
+  });
+
+  function renderForest(){
+    const f=$('forest');f.innerHTML='';
+    const n=Math.max(trees,1);
+    for(let i=0;i<Math.min(n*3,14);i++){
+      const t=document.createElement('div');t.className='tree';
+      t.style.height='0px';f.appendChild(t);
+      setTimeout(()=>{t.style.height=(30+Math.random()*40)+'px';},30*i);
+    }
+    $('impactKg').textContent='≈ '+(trees*18)+' kg CO₂';
+  }
+
+  // MENU sub-pages
+  let prevPage = null;
+  document.querySelectorAll('.menu-item[data-sub]').forEach(item=>{
+    item.addEventListener('click',()=>{
+      const cur = document.querySelector('.page.on');
+      prevPage = cur ? cur.id : 'p-profile';
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+      document.getElementById(item.dataset.sub).classList.add('on');
+      document.querySelector('.tabs').style.display='none';
+    });
+  });
+  function goBack(){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+    document.getElementById(prevPage||'p-profile').classList.add('on');
+    document.querySelector('.tabs').style.display='';
+  }
+
+  // TOGGLE switches
+  document.querySelectorAll('.toggle[data-tog]').forEach(tog=>{
+    tog.addEventListener('click',()=>tog.classList.toggle('on'));
+  });
+
+  // TABS
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+      tab.classList.add('on');
+      $(tab.dataset.go).classList.add('on');
+    });
+  });
+
+  refresh();
+</script>
+</body>
+</html>
